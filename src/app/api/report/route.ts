@@ -115,6 +115,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(fallbackReport(sessionData));
     }
 
+    const provider = process.env.BEDROCK_PROVIDER ?? "anthropic";
+    const modelId =
+      process.env.BEDROCK_MODEL_ID ??
+      "anthropic.claude-sonnet-4-20250514-v1:0";
+
     const client = new BedrockRuntimeClient({
       region: process.env.AWS_REGION ?? "us-east-1",
       credentials: {
@@ -123,32 +128,44 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const modelBody = JSON.stringify({
-      anthropic_version: "bedrock-2023-05-31",
-      max_tokens: 1024,
-      temperature: 0.3,
-      system: SYSTEM_PROMPT,
-      messages: [
-        {
-          role: "user",
-          content: JSON.stringify(sessionData),
-        },
-      ],
-    });
+    // Anthropic and Amazon Nova use different request/response formats
+    let modelBody: string;
+    if (provider === "amazon") {
+      modelBody = JSON.stringify({
+        messages: [
+          {
+            role: "user",
+            content: [{ text: JSON.stringify(sessionData) }],
+          },
+        ],
+        system: [{ text: SYSTEM_PROMPT }],
+        inferenceConfig: { maxTokens: 1024, temperature: 0.3 },
+      });
+    } else {
+      modelBody = JSON.stringify({
+        anthropic_version: "bedrock-2023-05-31",
+        max_tokens: 1024,
+        temperature: 0.3,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: "user", content: JSON.stringify(sessionData) }],
+      });
+    }
 
     const command = new InvokeModelCommand({
-      modelId: "anthropic.claude-sonnet-4-20250514-v1:0",
+      modelId,
       contentType: "application/json",
       accept: "application/json",
       body: new TextEncoder().encode(modelBody),
     });
 
     const response = await client.send(command);
-    const responseBody = JSON.parse(
-      new TextDecoder().decode(response.body)
-    );
+    const responseBody = JSON.parse(new TextDecoder().decode(response.body));
+
+    // Extract text from whichever response shape was returned
     const text =
-      responseBody.content?.[0]?.text ?? responseBody.completion ?? "";
+      provider === "amazon"
+        ? (responseBody.output?.message?.content?.[0]?.text ?? "")
+        : (responseBody.content?.[0]?.text ?? responseBody.completion ?? "");
 
     const report = parseReport(text);
     if (!report) {
