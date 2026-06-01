@@ -4,17 +4,28 @@ import { useEffect, useRef, useState } from "react";
 import { initPose } from "@/lib/pose/mediapose";
 import type { Landmark } from "@/lib/pose/types";
 
-export function usePoseDetection(videoRef: React.RefObject<HTMLVideoElement | null>) {
+export function usePoseDetection(
+  videoRef: React.RefObject<HTMLVideoElement | null>,
+  cameraActive: boolean = true
+) {
   const [landmarks, setLandmarks] = useState<Landmark[] | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+    if (!cameraActive) {
+      cleanupRef.current?.();
+      cleanupRef.current = null;
+      setLandmarks(null);
+      setIsLoading(false);
+      setError(null);
+      return;
+    }
 
     let mounted = true;
+    setIsLoading(true);
+    setError(null);
 
     async function start() {
       const el = videoRef.current;
@@ -44,6 +55,7 @@ export function usePoseDetection(videoRef: React.RefObject<HTMLVideoElement | nu
         cleanupRef.current = () => {
           cleanup();
           stream.getTracks().forEach((t) => t.stop());
+          el.srcObject = null;
         };
       } catch (err) {
         if (!mounted) return;
@@ -72,7 +84,7 @@ export function usePoseDetection(videoRef: React.RefObject<HTMLVideoElement | nu
       cleanupRef.current?.();
       cleanupRef.current = null;
     };
-  }, [videoRef]);
+  }, [videoRef, cameraActive]);
 
   return { landmarks, isLoading, error };
 }

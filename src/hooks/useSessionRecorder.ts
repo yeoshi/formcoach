@@ -14,6 +14,11 @@ import type {
 const MAX_FLAGGED_FRAMES = 20;
 const CAPTURE_COOLDOWN_MS = 2000;
 
+// A blank/black JPEG compresses to very few bytes; real webcam frames are much larger
+function isValidFrame(base64: string): boolean {
+  return base64.length > 5000;
+}
+
 export function useSessionRecorder() {
   const [flaggedFrames, setFlaggedFrames] = useState<FlaggedFrame[]>([]);
   const [repDataList, setRepDataList] = useState<RepData[]>([]);
@@ -34,6 +39,8 @@ export function useSessionRecorder() {
 
       lastCaptureRef.current = now;
       const imageBase64 = canvas.toDataURL("image/jpeg", 0.6);
+
+      if (!isValidFrame(imageBase64)) return;
 
       const frame: FlaggedFrame = {
         imageBase64,
@@ -75,11 +82,13 @@ export function useSessionRecorder() {
       const durationSeconds = Math.floor(
         (Date.now() - sessionStartRef.current) / 1000
       );
+      const successfulReps = repDataList.filter((r) => r.successful).length;
       const session: Session = {
         id: uuidv4(),
         date: new Date().toISOString(),
         exercise: "push-up",
         totalReps: repDataList.length,
+        successfulReps,
         durationSeconds,
         formScore,
         violations: allViolations,

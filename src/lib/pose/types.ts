@@ -54,11 +54,27 @@ export interface FlaggedFrame {
 
 export interface RepData {
   repNumber: number;
+  successful: boolean;
   minElbowAngle: number;
   hipDeviation: number;
   durationSeconds: number;
   violations: ViolationRule[];
-  formScore: number;
+}
+
+/** Personal baseline from 3s calibration hold (session ref only) */
+export interface PersonalBaseline {
+  hipDeviation: number;
+  headAngle: number;
+  bodyAngle: number;
+  shoulderHeight: number;
+  elbowAngleRest: number;
+}
+
+/** Used by form engine — offsets + widened thresholds */
+export interface FormBaseline extends PersonalBaseline {
+  adjustedHipSagThreshold: number;
+  adjustedPikeThreshold: number;
+  adjustedHeadCraneThreshold: number;
 }
 
 export interface BedrockReport {
