@@ -1,9 +1,22 @@
 /**
  * Run once: npm run generate-audio
- * Requires AWS credentials in environment.
+ * Loads credentials from .env.local automatically.
  */
-import { writeFileSync, mkdirSync } from "fs";
+import { writeFileSync, mkdirSync, readFileSync } from "fs";
 import { join } from "path";
+
+// Load .env.local so credentials don't need to be exported manually
+try {
+  const envFile = readFileSync(join(process.cwd(), ".env.local"), "utf-8");
+  for (const line of envFile.split("\n")) {
+    const [key, ...rest] = line.split("=");
+    if (key?.trim() && rest.length) {
+      process.env[key.trim()] = rest.join("=").trim();
+    }
+  }
+} catch {
+  // No .env.local found — fall back to existing environment variables
+}
 import { PollyClient, SynthesizeSpeechCommand } from "@aws-sdk/client-polly";
 import { CUE_TEXT, POSITIVE_CUES } from "../src/lib/constants";
 
@@ -39,6 +52,10 @@ async function main() {
 
   const client = new PollyClient({
     region: process.env.AWS_REGION ?? "us-east-1",
+    credentials: {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? "",
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? "",
+    },
   });
 
   for (const [rule, cue] of Object.entries(CUE_TEXT)) {
