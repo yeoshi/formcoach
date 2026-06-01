@@ -266,7 +266,7 @@ export function getFrameViolations(
   if (
     repState.phase === "ascending" &&
     elbowAngle < FORM_THRESHOLDS.MIN_LOCKOUT_ANGLE &&
-    elbowAngle >= repState.maxElbowAngle - 15
+    repState.maxElbowAngle >= FORM_THRESHOLDS.MIN_LOCKOUT_ANGLE - 20
   ) {
     flags.push({
       rule: "lockout",

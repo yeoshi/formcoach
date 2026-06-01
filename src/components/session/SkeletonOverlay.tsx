@@ -42,7 +42,7 @@ export function drawSkeleton(
   canvasHeight: number,
   violations: ViolationRule[] = []
 ) {
-  const px = (lm: Landmark) => lm.x * canvasWidth;
+  const px = (lm: Landmark) => (1 - lm.x) * canvasWidth;
   const py = (lm: Landmark) => lm.y * canvasHeight;
   const vis = (lm: Landmark) => lm?.visibility ?? 0;
 
