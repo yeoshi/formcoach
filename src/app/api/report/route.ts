@@ -8,6 +8,9 @@ import type { SessionDataForReport } from "@/lib/types";
 
 const SYSTEM_PROMPT = `You are a friendly, encouraging fitness coach analyzing a push-up session.
 You receive structured data about the user's reps and form violations.
+The payload includes successfulReps (counted good reps) and totalReps (all attempts including failed).
+Critical violations (hip_sag, depth, pike) invalidate a rep — those reps have successful: false.
+Non-critical violations (head_crane, lockout) still count as successful but should be mentioned.
 
 Respond ONLY with valid JSON (no markdown fences, no preamble). Schema:
 
@@ -33,28 +36,65 @@ Respond ONLY with valid JSON (no markdown fences, no preamble). Schema:
   ]
 }
 
-Rules for scoring:
-- Start at 100, deduct points per violation
-- hip_sag/pike: -5 per occurrence
-- depth: -4 per occurrence
-- lockout: -3 per occurrence
-- head_crane: -2 per occurrence
-- Minimum score: 20
+Score calculation:
+- Base score: 100
+- Per FAILED rep (critical violation, successful: false): -5 points
+- Per unique violation type that appeared: -3 points
+- Bonus: +2 for every 3 consecutive good reps (no violations)
+- Floor: 30 (never go below 30)
 - Round to nearest 5
+- A session with 8 good reps out of 18 total should score around 50-60, not 20.
 
 Rules for topIssues:
 - Max 3 issues, sorted by count descending
 - frameIndex should reference which flagged frame best shows this issue (0-indexed)
 - If there are no violations at all, return empty topIssues array and formScore of 95-100
 
+CRITICAL: Each issue MUST have a unique, specific fix tailored to that exact violation. Never repeat the same tip across issues.
+Good examples (use these as inspiration, not verbatim):
+- hip_sag: "Squeeze your glutes and brace your core before each rep. Imagine balancing a cup of water on your lower back."
+- pike: "Think about pushing your belly button toward the floor. Your hips should be at the same height as your shoulders."
+- depth: "Aim to touch your chest to a tennis ball on the floor. Your elbows need to reach 90 degrees or below."
+- head_crane: "Pick a spot on the floor about 30cm ahead of your hands and keep your eyes fixed on it throughout."
+- lockout: "At the top of each rep, push the ground away until your arms are fully straight — think 'lock and press'."
+If you give the same tip for two different issues, you have FAILED the task.
+
 Tone: Like a supportive gym buddy. Use "you" not "the user". Short sentences. No jargon.`;
 
+const FALLBACK_FIXES: Record<string, string> = {
+  hip_sag: "Squeeze your glutes and brace your core before each rep. Imagine balancing a cup of water on your lower back.",
+  pike: "Push your belly button toward the floor. Your hips should stay at the same height as your shoulders throughout.",
+  depth: "Aim to touch your chest to a tennis ball on the floor. Your elbows need to reach 90 degrees or below.",
+  head_crane: "Pick a spot on the floor about 30cm ahead of your hands and keep your eyes fixed on it throughout.",
+  lockout: "At the top of each rep, push the ground away until your arms are fully straight — think 'lock and press'.",
+};
+
+const FALLBACK_EXPLANATIONS: Record<string, string> = {
+  hip_sag: "Your hips were dropping below shoulder level, causing a sag in the middle of your body.",
+  pike: "Your hips were rising too high, forming an upside-down V instead of a straight line.",
+  depth: "Your elbows weren't bending far enough — aim for at least 90 degrees to count the rep.",
+  head_crane: "Your head was lifting or tilting forward, breaking the straight line from head to heel.",
+  lockout: "Your arms weren't fully extending at the top — you need to lock out completely between reps.",
+};
+
 function fallbackReport(data: SessionDataForReport): BedrockReport {
-  const violationCount = data.violations.length;
-  const score = Math.max(
-    20,
-    Math.round((100 - violationCount * 5) / 5) * 5
-  );
+  const failedReps = data.repData.filter((r) => !r.successful).length;
+  const uniqueViolationTypes = new Set(data.violations.map((v) => v.rule)).size;
+
+  let consecutiveGood = 0;
+  let streakBonus = 0;
+  for (const rep of data.repData) {
+    if (rep.successful && rep.violations.length === 0) {
+      consecutiveGood++;
+      if (consecutiveGood % 3 === 0) streakBonus += 2;
+    } else {
+      consecutiveGood = 0;
+    }
+  }
+
+  const raw = 100 - failedReps * 5 - uniqueViolationTypes * 3 + streakBonus;
+  const score = Math.round(Math.max(30, Math.min(100, raw)) / 5) * 5;
+
   const ruleCounts: Record<string, number> = {};
   data.violations.forEach((v) => {
     ruleCounts[v.rule] = (ruleCounts[v.rule] ?? 0) + 1;
@@ -66,21 +106,35 @@ function fallbackReport(data: SessionDataForReport): BedrockReport {
     .map(([rule, count], i) => ({
       rule: rule as BedrockReport["topIssues"][0]["rule"],
       count,
-      explanation: `You had ${count} instances of ${rule.replace("_", " ")}.`,
-      fix: "Focus on maintaining a straight body line throughout each rep.",
+      explanation: FALLBACK_EXPLANATIONS[rule] ?? `You had ${count} instances of ${rule.replace("_", " ")}.`,
+      fix: FALLBACK_FIXES[rule] ?? "Focus on maintaining a straight body line throughout each rep.",
       frameIndex: i,
     }));
 
   return {
-    summary: `You completed ${data.totalReps} reps in ${data.durationSeconds} seconds. Keep practicing to improve your form.`,
+    summary: `You completed ${data.successfulReps} good reps out of ${data.totalReps} total. ${data.successfulReps > 0 ? "Good effort — keep working on your form." : "Keep at it, form comes with practice."}`,
     formScore: score,
     topIssues,
-    nextSessionFocus: "Focus on keeping your hips level throughout each rep.",
-    repBreakdown: data.repData.map((r) => ({
-      repNumber: r.repNumber,
-      status: r.violations.length === 0 ? "good" : "minor_issues",
-      note: r.violations[0]?.replace("_", " "),
-    })),
+    nextSessionFocus: topIssues[0]
+      ? `Focus on fixing your ${topIssues[0].rule.replace("_", " ")} — it's your most common issue.`
+      : "Focus on keeping your hips level throughout each rep.",
+    repBreakdown: data.repData.map((r) => {
+      if (!r.successful) {
+        return {
+          repNumber: r.repNumber,
+          status: "needs_work" as const,
+          note: "Did not count",
+        };
+      }
+      if (r.violations.length === 0) {
+        return { repNumber: r.repNumber, status: "good" as const };
+      }
+      return {
+        repNumber: r.repNumber,
+        status: "minor_issues" as const,
+        note: r.violations[0]?.replace("_", " "),
+      };
+    }),
   };
 }
 

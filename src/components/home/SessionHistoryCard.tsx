@@ -1,8 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Card } from "@/components/ui/Card";
-import { ProgressBar } from "@/components/ui/ProgressBar";
 import type { Session } from "@/lib/types";
 
 const RULE_LABELS: Record<string, string> = {
@@ -13,12 +11,6 @@ const RULE_LABELS: Record<string, string> = {
   lockout: "Lockout",
 };
 
-function scoreColor(score: number): "green" | "amber" | "red" {
-  if (score >= 80) return "green";
-  if (score >= 50) return "amber";
-  return "red";
-}
-
 interface SessionHistoryCardProps {
   session: Session;
 }
@@ -28,28 +20,65 @@ export function SessionHistoryCard({ session }: SessionHistoryCardProps) {
     month: "short",
     day: "numeric",
   });
+  const time = new Date(session.date).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
   const score = session.report?.formScore ?? session.formScore;
+  const goodReps =
+    session.successfulReps ??
+    session.repData.filter((r) => r.successful).length;
+  const totalReps = session.totalReps;
   const topIssue =
     session.report?.topIssues[0]?.rule ??
     session.violations[0]?.rule ??
     null;
 
+  const scoreColor =
+    score >= 80 ? "#2DD881" : score >= 50 ? "#FF6B2C" : "#FF3B3B";
+
+  const pct = Math.min(100, Math.max(0, score));
+
   return (
     <Link href={`/report/${session.id}`}>
-      <Card hover>
-        <div className="flex justify-between items-start mb-2">
-          <span className="text-text-secondary text-sm">{date}</span>
-          <span className="font-mono text-sm">
-            {session.totalReps} reps · Score: {score}/100
+      <div className="bg-surface border border-border rounded-card p-4 hover:border-border-accent transition-colors cursor-pointer group">
+        <div className="flex justify-between items-start mb-3">
+          <div>
+            <span className="text-text-primary text-sm font-semibold">{date}</span>
+            <span className="text-text-muted text-xs ml-2">{time}</span>
+          </div>
+          <span
+            className="text-xs font-bold px-2.5 py-1 rounded-pill"
+            style={{
+              background: `${scoreColor}22`,
+              color: scoreColor,
+              border: `1px solid ${scoreColor}44`,
+            }}
+          >
+            {score}/100
           </span>
         </div>
-        {topIssue && (
-          <p className="text-sm text-text-secondary mb-3">
-            Top issue: {RULE_LABELS[topIssue] ?? topIssue}
-          </p>
-        )}
-        <ProgressBar value={score} color={scoreColor(score)} />
-      </Card>
+
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-text-secondary text-sm">
+            <span className="text-text-primary font-bold">{goodReps}</span>
+            <span className="text-text-muted">/{totalReps}</span>
+            <span className="text-text-muted ml-1">reps</span>
+          </span>
+          {topIssue && (
+            <span className="text-xs text-text-muted">
+              {RULE_LABELS[topIssue] ?? topIssue}
+            </span>
+          )}
+        </div>
+
+        <div className="h-1.5 w-full rounded-full bg-surface-elevated overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${pct}%`, backgroundColor: scoreColor }}
+          />
+        </div>
+      </div>
     </Link>
   );
 }

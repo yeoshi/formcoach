@@ -2,9 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Card } from "@/components/ui/Card";
 import { ProgressBar } from "@/components/ui/ProgressBar";
-import { Button } from "@/components/ui/Button";
 import { IssueCard } from "./IssueCard";
 import { RepTimeline } from "./RepTimeline";
 import { generateReport } from "@/lib/api/bedrock";
@@ -33,15 +31,27 @@ function AnimatedScore({ target }: { target: number }) {
   }, [target]);
 
   const color =
-    score >= 80 ? "text-accent-green" : score >= 50 ? "text-accent-amber" : "text-accent-red";
+    score >= 80 ? "#2DD881" : score >= 50 ? "#FF6B2C" : "#FF3B3B";
 
-  return <span className={`font-mono text-3xl font-bold ${color}`}>{score}</span>;
+  return (
+    <span className="font-mono text-3xl font-extrabold" style={{ color }}>
+      {score}
+    </span>
+  );
 }
 
-function scoreColor(score: number): "green" | "amber" | "red" {
+function scoreColor(score: number): "green" | "orange" | "red" {
   if (score >= 80) return "green";
-  if (score >= 50) return "amber";
+  if (score >= 50) return "orange";
   return "red";
+}
+
+function StatCard({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="bg-surface border border-border rounded-card p-4 text-center">
+      {children}
+    </div>
+  );
 }
 
 export function ReportCard({ sessionId }: ReportCardProps) {
@@ -62,6 +72,9 @@ export function ReportCard({ sessionId }: ReportCardProps) {
       const sessionData: SessionDataForReport = {
         exercise: "push-up",
         totalReps: session.totalReps,
+        successfulReps:
+          session.successfulReps ??
+          session.repData.filter((r) => r.successful).length,
         durationSeconds: session.durationSeconds,
         violations: session.violations.map((v) => ({
           rule: v.rule,
@@ -94,30 +107,34 @@ export function ReportCard({ sessionId }: ReportCardProps) {
 
   if (!session) {
     return (
-      <Card>
+      <div className="bg-surface border border-border rounded-card p-6 text-center">
         <p className="text-text-secondary mb-4">Session not found.</p>
-        <Link href="/" className="text-accent-blue hover:underline">
+        <Link href="/" className="text-accent-orange hover:underline">
           ← Back to Home
         </Link>
-      </Card>
+      </div>
     );
   }
 
   if (!session.report) {
     return (
-      <Card>
-        <p className="text-text-secondary mb-4">
-          Report couldn&apos;t be generated.
-        </p>
-        <Button onClick={handleRetryReport} disabled={retrying}>
+      <div className="bg-surface border border-border rounded-card p-6 text-center space-y-4">
+        <p className="text-text-secondary">Report couldn&apos;t be generated.</p>
+        <button
+          type="button"
+          onClick={handleRetryReport}
+          disabled={retrying}
+          className="w-full h-14 text-white font-bold rounded-button disabled:opacity-50"
+          style={{ background: "linear-gradient(135deg, #FF6B2C 0%, #FF8A50 100%)" }}
+        >
           {retrying ? "Generating…" : "Retry Report"}
-        </Button>
-      </Card>
+        </button>
+      </div>
     );
   }
 
   const report = session.report;
-  const date = new Date(session.date).toLocaleDateString("en-US", {
+  const date = new Date(session.date).toLocaleDateString("en-SG", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -129,46 +146,59 @@ export function ReportCard({ sessionId }: ReportCardProps) {
     return `${m}:${String(sec).padStart(2, "0")}`;
   };
 
+  const successfulReps =
+    session.successfulReps ??
+    session.repData.filter((r) => r.successful).length;
+  const totalAttempts = session.totalReps;
+
   return (
     <div className="space-y-8 page-fade">
+      {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold mb-1">SESSION COMPLETE ✅</h1>
-        <p className="text-text-secondary">
-          {date} · Push-ups
-        </p>
+        <p className="section-header">Session Complete</p>
+        <p className="text-text-muted text-sm">{date} · Push-ups</p>
       </div>
 
+      {/* Stats row */}
       <div className="grid grid-cols-3 gap-3">
-        <Card className="text-center">
-          <div className="font-mono text-3xl font-bold">{session.totalReps}</div>
-          <div className="text-xs text-text-secondary mt-1">reps</div>
-        </Card>
-        <Card className="text-center">
-          <div className="font-mono text-3xl font-bold">
+        <StatCard>
+          <div className="font-mono font-extrabold leading-none mb-1">
+            <span className="text-3xl text-accent-green">{successfulReps}</span>
+            <span className="text-base text-text-muted">/{totalAttempts}</span>
+          </div>
+          <div className="text-xs text-text-secondary uppercase tracking-wide">reps</div>
+        </StatCard>
+        <StatCard>
+          <div className="font-mono text-3xl font-extrabold leading-none mb-1">
             {formatTime(session.durationSeconds)}
           </div>
-          <div className="text-xs text-text-secondary mt-1">time</div>
-        </Card>
-        <Card className="text-center">
-          <AnimatedScore target={report.formScore} />
-          <div className="text-xs text-text-secondary mt-1">score</div>
-        </Card>
+          <div className="text-xs text-text-secondary uppercase tracking-wide">time</div>
+        </StatCard>
+        <StatCard>
+          <div className="leading-none mb-1">
+            <AnimatedScore target={report.formScore} />
+          </div>
+          <div className="text-xs text-text-secondary uppercase tracking-wide">score</div>
+        </StatCard>
       </div>
 
+      {/* Progress bar + summary */}
       <div>
         <ProgressBar
           value={report.formScore}
           color={scoreColor(report.formScore)}
-          className="mb-3"
+          animated
+          className="mb-4 h-2"
         />
-        <p className="text-text-secondary italic">&ldquo;{report.summary}&rdquo;</p>
+        <div className="border-l-4 border-accent-orange pl-4 py-1">
+          <p className="text-text-secondary italic text-sm">&ldquo;{report.summary}&rdquo;</p>
+        </div>
       </div>
 
+      {/* Top Issues */}
       {report.topIssues.length > 0 && (
         <section>
-          <h2 className="text-sm font-semibold text-text-secondary tracking-wider mb-4">
-            TOP ISSUES TO FIX
-          </h2>
+          <p className="section-header">Top Issues to Fix</p>
           <div className="space-y-4">
             {report.topIssues.map((issue, i) => (
               <IssueCard
@@ -177,9 +207,7 @@ export function ReportCard({ sessionId }: ReportCardProps) {
                 count={issue.count}
                 explanation={issue.explanation}
                 fix={issue.fix}
-                frameBase64={
-                  session.flaggedFrames[issue.frameIndex]?.imageBase64
-                }
+                frameBase64={session.flaggedFrames[issue.frameIndex]?.imageBase64}
                 index={i}
               />
             ))}
@@ -187,26 +215,41 @@ export function ReportCard({ sessionId }: ReportCardProps) {
         </section>
       )}
 
+      {/* Next Session Focus */}
       <section>
-        <h2 className="text-sm font-semibold text-text-secondary tracking-wider mb-3">
-          🎯 NEXT SESSION FOCUS
-        </h2>
-        <Card className="border-l-4 border-l-accent-blue">
-          {report.nextSessionFocus}
-        </Card>
+        <p className="section-header">Next Session Focus</p>
+        <div
+          className="bg-surface rounded-card p-4 flex items-start gap-3"
+          style={{ borderLeft: "4px solid #FF6B2C" }}
+        >
+          <span className="text-xl shrink-0">🎯</span>
+          <p className="text-text-primary text-sm leading-relaxed">
+            {report.nextSessionFocus}
+          </p>
+        </div>
       </section>
 
+      {/* Rep Breakdown */}
       <section>
-        <h2 className="text-sm font-semibold text-text-secondary tracking-wider mb-4">
-          REP-BY-REP BREAKDOWN
-        </h2>
-        <RepTimeline repBreakdown={report.repBreakdown} />
+        <p className="section-header">Rep-by-Rep Breakdown</p>
+        <RepTimeline
+          repBreakdown={report.repBreakdown}
+          repData={session.repData}
+        />
       </section>
 
+      {/* CTA */}
       <Link href="/session">
-        <Button size="lg" className="w-full">
+        <button
+          type="button"
+          className="w-full h-14 text-white font-bold text-base rounded-button transition-all hover:brightness-110 active:scale-[0.98]"
+          style={{
+            background: "linear-gradient(135deg, #FF6B2C 0%, #FF8A50 100%)",
+            boxShadow: "0 4px 20px rgba(255, 107, 44, 0.3)",
+          }}
+        >
           Start New Session →
-        </Button>
+        </button>
       </Link>
     </div>
   );

@@ -31,11 +31,11 @@ export default function RootLayout({
           <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
             <Link
               href="/"
-              className="text-text-secondary hover:text-text-primary text-sm"
+              className="text-text-muted hover:text-text-secondary text-sm transition-colors"
             >
               ← Home
             </Link>
-            <Link href="/" className="font-bold text-lg">
+            <Link href="/" className="font-bold text-lg text-accent-orange">
               FormCoach
             </Link>
             <div className="w-16" />

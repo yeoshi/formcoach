@@ -3,22 +3,30 @@
 @tailwind utilities;
 
 :root {
-  --bg: #0a0a0b;
-  --surface: #141416;
-  --surface-hover: #1c1c1f;
-  --border: #2a2a2e;
-  --text-primary: #f5f5f7;
-  --text-secondary: #8e8e93;
-  --accent-green: #30d158;
-  --accent-red: #ff453a;
-  --accent-amber: #ffd60a;
-  --accent-blue: #0a84ff;
+  --bg: #0D0D0D;
+  --surface: #1A1A1A;
+  --surface-hover: #222222;
+  --surface-elevated: #242424;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-accent: rgba(255, 107, 44, 0.3);
+  --text-primary: #FFFFFF;
+  --text-secondary: #9CA3AF;
+  --text-muted: #6B7280;
+  --accent-orange: #FF6B2C;
+  --accent-orange-hover: #FF8A50;
+  --accent-orange-muted: rgba(255, 107, 44, 0.15);
+  --accent-gradient: linear-gradient(135deg, #FF6B2C 0%, #FF8A50 100%);
+  --accent-green: #2DD881;
+  --accent-red: #FF3B3B;
+  --accent-amber: #FFB800;
+  --accent-blue: #0A84FF;
 }
 
 body {
   background-color: var(--bg);
   color: var(--text-primary);
   min-height: 100vh;
+  background-image: radial-gradient(ellipse at 50% 0%, rgba(255, 107, 44, 0.04) 0%, transparent 60%);
 }
 
 @layer utilities {
@@ -28,6 +36,25 @@ body {
 
   .page-fade {
     animation: fadeIn 0.3s ease-out;
+  }
+
+  .btn-primary {
+    background: var(--accent-gradient);
+    @apply text-white font-bold rounded-button h-14 w-full max-w-md transition-all;
+    box-shadow: 0 4px 20px rgba(255, 107, 44, 0.3);
+  }
+
+  .btn-primary:hover {
+    filter: brightness(1.1);
+    box-shadow: 0 6px 28px rgba(255, 107, 44, 0.45);
+  }
+
+  .btn-primary:active {
+    transform: scale(0.98);
+  }
+
+  .section-header {
+    @apply text-xs font-bold tracking-widest uppercase text-accent-orange mb-4;
   }
 }
 
@@ -73,6 +100,31 @@ body {
   }
 }
 
+@keyframes setup-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.65;
+  }
+}
+
+@keyframes score-fill {
+  from {
+    width: 0%;
+  }
+}
+
+@keyframes streak-glow {
+  0%, 100% {
+    box-shadow: 0 0 6px rgba(255, 107, 44, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 14px rgba(255, 107, 44, 0.8);
+  }
+}
+
 .animate-pulse-rep {
   animation: pulse-rep 0.4s ease-out;
 }
@@ -83,4 +135,20 @@ body {
 
 .animate-blink-timer {
   animation: blink-timer 2s ease-in-out infinite;
+}
+
+.animate-setup-pulse {
+  animation: setup-pulse 2s ease-in-out infinite;
+}
+
+.animate-streak-glow {
+  animation: streak-glow 1s ease-in-out infinite;
+}
+
+.animate-score-fill {
+  animation: score-fill 0.8s ease-out both;
+}
+
+.form-feedback-banner {
+  will-change: transform, opacity;
 }

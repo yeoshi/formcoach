@@ -1,56 +1,152 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { CUE_TEXT } from "@/lib/constants";
-import type { Violation } from "@/lib/pose/types";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ERROR_SCREEN_RULES,
+  SCREEN_CUE,
+  WARNING_SCREEN_RULES,
+} from "@/lib/constants";
+import type { Violation, ViolationRule } from "@/lib/pose/types";
+
+type BannerVariant = "error" | "warning" | "success" | "paused" | "hidden";
 
 interface FormFeedbackProps {
   violations: Violation[];
-  isEscalation?: boolean;
+  paused?: boolean;
+  streakMessage?: string | null;
+  positiveMessage?: string | null;
 }
 
-export function FormFeedback({ violations, isEscalation = false }: FormFeedbackProps) {
-  const [visible, setVisible] = useState(false);
+const DISPLAY_MS = 2500;
+const FADE_OUT_MS = 300;
+
+function variantForRule(rule: ViolationRule): "error" | "warning" {
+  if ((ERROR_SCREEN_RULES as readonly string[]).includes(rule)) return "error";
+  if ((WARNING_SCREEN_RULES as readonly string[]).includes(rule)) return "warning";
+  return "error";
+}
+
+const BANNER_STYLES: Record<
+  Exclude<BannerVariant, "hidden">,
+  { bg: string; color: string }
+> = {
+  error: { bg: "rgba(255, 69, 58, 0.9)", color: "#ffffff" },
+  warning: { bg: "rgba(255, 214, 10, 0.9)", color: "#000000" },
+  success: { bg: "rgba(48, 209, 88, 0.9)", color: "#ffffff" },
+  paused: { bg: "rgba(0, 0, 0, 0.85)", color: "#ffffff" },
+};
+
+export function FormFeedback({
+  violations,
+  paused = false,
+  streakMessage = null,
+  positiveMessage = null,
+}: FormFeedbackProps) {
   const [message, setMessage] = useState("");
+  const [variant, setVariant] = useState<BannerVariant>("hidden");
+  const [phase, setPhase] = useState<"hidden" | "in" | "visible" | "out">(
+    "hidden"
+  );
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearTimers = () => {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
+    hideTimerRef.current = null;
+    fadeTimerRef.current = null;
+  };
+
+  const showBanner = useCallback(
+    (text: string, v: Exclude<BannerVariant, "hidden">) => {
+      clearTimers();
+      setMessage(text.slice(0, 30).toUpperCase());
+      setVariant(v);
+      setPhase("in");
+      requestAnimationFrame(() => setPhase("visible"));
+
+      if (v === "paused") return;
+
+      hideTimerRef.current = setTimeout(() => {
+        setPhase("out");
+        fadeTimerRef.current = setTimeout(() => {
+          setVariant("hidden");
+          setPhase("hidden");
+        }, FADE_OUT_MS);
+      }, DISPLAY_MS);
+    },
+    []
+  );
 
   useEffect(() => {
+    if (paused) {
+      showBanner("STEP BACK INTO FRAME", "paused");
+      return () => clearTimers();
+    }
+
+    if (streakMessage) {
+      showBanner(SCREEN_CUE.great_streak, "success");
+      return () => clearTimers();
+    }
+
+    if (positiveMessage) {
+      showBanner(SCREEN_CUE.great_rep, "success");
+      return () => clearTimers();
+    }
+
     if (violations.length === 0) {
-      setVisible(false);
+      clearTimers();
+      setVariant("hidden");
+      setPhase("hidden");
       return;
     }
 
     const top = violations.reduce((a, b) =>
       a.severity >= b.severity ? a : b
     );
-    const cue = CUE_TEXT[top.rule];
-    setMessage(isEscalation ? cue.escalation : cue.screen);
-    setVisible(true);
+    const text = SCREEN_CUE[top.rule] ?? top.message;
+    showBanner(text, variantForRule(top.rule));
 
-    const hide = setTimeout(() => setVisible(false), 3000);
-    return () => clearTimeout(hide);
-  }, [violations, isEscalation]);
+    return () => clearTimers();
+  }, [violations, paused, streakMessage, positiveMessage, showBanner]);
 
-  if (!visible || !message) return null;
+  if (variant === "hidden" || phase === "hidden") return null;
 
-  const severity = violations[0]?.severity ?? 0.5;
+  const styles = BANNER_STYLES[variant];
 
   return (
     <div
-      className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 max-w-[90%]"
+      className="absolute bottom-0 left-0 right-0 z-30 flex items-center justify-center form-feedback-banner"
+      style={{
+        height: 60,
+        padding: "0 20px",
+        backgroundColor: styles.bg,
+        opacity: phase === "out" ? 0 : phase === "in" ? 0 : 1,
+        transform:
+          phase === "in"
+            ? "translateY(100%)"
+            : phase === "out"
+              ? "translateY(8px)"
+              : "translateY(0)",
+        transition:
+          phase === "out"
+            ? `opacity ${FADE_OUT_MS}ms ease-out, transform ${FADE_OUT_MS}ms ease-out`
+            : "opacity 200ms ease-out, transform 200ms ease-out",
+      }}
       aria-live="polite"
       role="status"
     >
-      <div
-        className={`animate-slide-up px-5 py-3 rounded-full text-sm font-medium ${
-          isEscalation
-            ? "bg-accent-amber/20 text-accent-amber border-2 border-accent-amber text-base"
-            : severity > 0.6
-              ? "bg-accent-red/90 text-white"
-              : "bg-accent-amber/90 text-bg"
-        }`}
+      <p
+        className="truncate w-full text-center uppercase font-extrabold leading-none"
+        style={{
+          fontSize: 28,
+          fontWeight: 800,
+          color: styles.color,
+          fontFamily: "var(--font-inter), system-ui, sans-serif",
+        }}
       >
         {message}
-      </div>
+      </p>
     </div>
   );
 }

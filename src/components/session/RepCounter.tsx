@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 
 interface RepCounterProps {
   count: number;
-  pulse?: boolean;
+  successFlash?: boolean;
 }
 
-export function RepCounter({ count, pulse = false }: RepCounterProps) {
+export function RepCounter({ count, successFlash = false }: RepCounterProps) {
   const [animating, setAnimating] = useState(false);
+  const [flashGreen, setFlashGreen] = useState(false);
   const [prevCount, setPrevCount] = useState(count);
 
   useEffect(() => {
@@ -21,16 +22,26 @@ export function RepCounter({ count, pulse = false }: RepCounterProps) {
     setPrevCount(count);
   }, [count, prevCount]);
 
+  useEffect(() => {
+    if (!successFlash) return;
+    setFlashGreen(true);
+    const t = setTimeout(() => setFlashGreen(false), 200);
+    return () => clearTimeout(t);
+  }, [successFlash]);
+
   return (
     <div
-      className={`absolute top-4 right-4 z-10 px-4 py-3 rounded-full bg-bg/70 backdrop-blur-md border border-border ${
-        animating || pulse ? "animate-pulse-rep" : ""
-      }`}
+      className={`absolute top-4 right-4 z-10 px-5 py-4 rounded-full bg-bg/70 backdrop-blur-md border transition-colors duration-200 ${
+        flashGreen
+          ? "border-accent-green bg-accent-green/20"
+          : "border-border"
+      } ${animating ? "animate-pulse-rep" : ""}`}
     >
       <div
-        className={`font-mono text-5xl font-bold text-text-primary leading-none ${
-          pulse ? "text-accent-green" : ""
+        className={`font-mono font-bold leading-none transition-colors duration-200 ${
+          flashGreen ? "text-accent-green" : "text-text-primary"
         }`}
+        style={{ fontSize: "56px" }}
       >
         {String(count).padStart(2, "0")}
       </div>

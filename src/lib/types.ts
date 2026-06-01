@@ -9,7 +9,10 @@ export interface Session {
   id: string;
   date: string;
   exercise: "push-up";
+  /** All rep attempts (good + failed) */
   totalReps: number;
+  /** Reps with no critical violations */
+  successfulReps: number;
   durationSeconds: number;
   formScore: number;
   violations: Violation[];
@@ -23,6 +26,7 @@ export type { BedrockReport };
 export interface SessionDataForReport {
   exercise: "push-up";
   totalReps: number;
+  successfulReps: number;
   durationSeconds: number;
   violations: {
     rule: string;
@@ -32,6 +36,7 @@ export interface SessionDataForReport {
   }[];
   repData: {
     repNumber: number;
+    successful: boolean;
     minElbowAngle: number;
     hipDeviation: number;
     durationSeconds: number;

@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Card } from "@/components/ui/Card";
-import { Badge } from "@/components/ui/Badge";
 import type { ViolationRule } from "@/lib/pose/types";
 
 const RULE_LABELS: Record<ViolationRule, string> = {
@@ -84,25 +82,34 @@ export function IssueCard({
   index,
 }: IssueCardProps) {
   return (
-    <Card
-      className="animate-slide-up"
-      style={{ animationDelay: `${index * 100}ms` } as React.CSSProperties}
+    <div
+      className="bg-surface border border-border rounded-card overflow-hidden animate-slide-up"
+      style={{ animationDelay: `${index * 100}ms`, borderLeft: "4px solid #FF3B3B" } as React.CSSProperties}
     >
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-lg">
-          {index + 1}. {RULE_LABELS[rule]}
-        </h3>
-        <Badge variant="red">{count} reps</Badge>
+      <div className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-bold text-lg text-text-primary">
+            {index + 1}. {RULE_LABELS[rule]}
+          </h3>
+          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-accent-orange/20 text-accent-orange border border-accent-orange/30">
+            {count} reps
+          </span>
+        </div>
       </div>
       {frameBase64 && (
-        <div className="mb-4 overflow-hidden rounded-lg">
+        <div className="overflow-hidden border-y border-accent-red/30">
           <AnnotatedFrame src={frameBase64} rule={rule} />
         </div>
       )}
-      <p className="text-text-secondary mb-4">{explanation}</p>
-      <div className="bg-accent-blue/10 border border-accent-blue/30 rounded-lg p-3 text-sm">
-        💡 {fix}
+      <div className="p-4 pt-3">
+        <p className="text-text-secondary text-sm mb-4 leading-relaxed">{explanation}</p>
+        <div
+          className="rounded-xl p-3 text-sm leading-relaxed"
+          style={{ background: "rgba(255,107,44,0.1)", borderLeft: "3px solid #FF6B2C" }}
+        >
+          💡 <span className="text-text-primary">{fix}</span>
+        </div>
       </div>
-    </Card>
+    </div>
   );
 }

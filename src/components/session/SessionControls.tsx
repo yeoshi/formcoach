@@ -1,39 +1,48 @@
 "use client";
 
-import { Button } from "@/components/ui/Button";
+import { useEffect, useRef, useState } from "react";
 
 interface SessionControlsProps {
-  timerSeconds: number;
   onEndSession: () => void;
   disabled?: boolean;
 }
 
-function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
-
 export function SessionControls({
-  timerSeconds,
   onEndSession,
   disabled = false,
 }: SessionControlsProps) {
+  const [confirming, setConfirming] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
+  const handleClick = () => {
+    if (disabled) return;
+    if (confirming) {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      onEndSession();
+    } else {
+      setConfirming(true);
+      timeoutRef.current = setTimeout(() => setConfirming(false), 3000);
+    }
+  };
+
   return (
-    <div className="flex items-center gap-4 w-full max-w-[800px] mx-auto mt-4">
-      <div className="flex-1 glass-card px-4 py-3 font-mono text-xl animate-blink-timer">
-        ⏱ {formatTime(timerSeconds)}
-      </div>
-      <Button
-        variant="danger"
-        size="lg"
-        onClick={onEndSession}
-        disabled={disabled}
-        className="flex-1"
-        aria-label="End session"
-      >
-        End Session ■
-      </Button>
-    </div>
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={disabled}
+      className={`w-full h-14 font-bold text-base tracking-wide transition-colors disabled:opacity-40 ${
+        confirming
+          ? "bg-red-700 text-white animate-pulse"
+          : "bg-red-600 hover:bg-red-700 text-white"
+      }`}
+    >
+      {confirming ? "TAP AGAIN TO END" : "END SESSION"}
+    </button>
   );
 }
